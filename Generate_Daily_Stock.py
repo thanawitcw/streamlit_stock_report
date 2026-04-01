@@ -95,6 +95,11 @@ def process_dc_stock(dc_stock_file):
         # Replace <0 with 0
         master_df['Stock Qty'] = master_df['Stock Qty'].where(master_df['Stock Qty'] >= 0, 0)
         master_df['Stock Value'] = master_df['Stock Value'].where(master_df['Stock Value'] >= 0, 0)
+
+        # deal with soft-serve product, Stock Unit = mL but sales unit = g
+        specific_materials = ['10000577', '10000578']
+        target_rows = master_df['Material'].astype(str).isin(specific_materials)
+        master_df.loc[target_rows, 'Stock Qty'] = master_df.loc[target_rows, 'Stock Qty'] / 13200
         
         # Pivot data
         pivoted_df = master_df.pivot_table(
