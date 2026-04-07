@@ -735,6 +735,8 @@ def generate_full_stock_report(
     
 
     st.header("Step 3: Finalizing the daily stock report...")
+    st.write("🔍 DEBUG: Columns in merged_df before Step 3 query:", merged_df.columns)
+
 
 
     # Step 3: Execute query to get the final report
