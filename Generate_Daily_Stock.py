@@ -826,7 +826,7 @@ def generate_full_stock_report(
         st.error("merged_df not found")
         return None, None
     
-    st.write(merged_df columns: {list(merged_df.columns)}")
+    st.write(f"✅ merged_df columns: {list(merged_df.columns)}")
              
     # Check if CJ_Item exists
     if 'CJ_Item' not in merged_df.columns:
