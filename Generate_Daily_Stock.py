@@ -99,6 +99,7 @@ def process_dc_stock(dc_stock_file):
         # deal with soft-serve product, Stock Unit = mL but sales unit = g
         specific_materials = ['10000577', '10000578']
         target_rows = master_df['Material'].astype(str).isin(specific_materials)
+
         master_df.loc[target_rows, 'Stock Qty'] = master_df.loc[target_rows, 'Stock Qty'] / 13200
         
         # Pivot data
@@ -160,92 +161,6 @@ def process_sellout_data(sellout_file):
     merged_pivot = merged_pivot.fillna(0)
     
     return merged_pivot
-
-
-# Hold this data HBA
-#def process_po_hba(po_hba_file):
-    """Process PO HBA data"""
-    df = pd.read_excel(po_hba_file, sheet_name='PendingPO', header=0)
-    df.columns = df.columns.str.strip()
-    
-    selected_columns = df[['CJ_Article', 
-                           'SHM_Article', 
-                           'SHM_PO NO.', 
-                           'CJ_PO Date',
-                           'CJ_PO NO.', 
-                           'CJ_Description', 
-                           'DC_Location', 
-                           'PO Pending',
-                           'PO_Status', 
-                           'Next Delivery', 
-                           'Supplier_Short_Name']]
-    
-    selected_columns.rename(columns={'CJ_PO Date': 'SHM_PO_Date'}, inplace=True)
-    date_cols_to_convert = ['SHM_PO_Date', 'Next Delivery']
-    for col in date_cols_to_convert:
-        if col in selected_columns:
-            selected_columns[col] = pd.to_numeric(selected_columns[col], errors = 'coerce')
-            selected_columns[col] = pd.to_datetime(selected_columns[col], origin = '1899-12-30', unit = 'D', errors='coerce')
-
-    selected_columns = selected_columns[selected_columns['PO_Status'].str.strip().str.lower() == 'pending']
-    selected_columns = selected_columns[selected_columns['CJ_Article'].notna() & (~selected_columns['CJ_Article'].isin(['Tester', 'New']))]
-    
-    selected_columns['CJ_Article'] = selected_columns['CJ_Article'].astype(str)
-    selected_columns['CJ_Article'] = selected_columns['CJ_Article'].apply(lambda x: x.rstrip('0').rstrip('.') if '.' in x else x)
-    selected_columns['SHM_Article'] = selected_columns['SHM_Article'].astype(str)
-    
-
-    selected_columns.loc[:, 'DC'] = selected_columns['DC_Location'].map({
-        'D001': 'DC1', 
-        'D002': 'DC2', 
-        'D004': 'DC4',
-        'TD09': 'TD09'
-    })
-    
-    df2 = pd.read_excel(po_hba_file, sheet_name='Supply Record', header=0)
-    selected_df2 = df2[['SHM_Article', 'Unit_PC/CAR']]
-    selected_df2.rename(columns={'Unit_PC/CAR': 'PC_Cartons'}, inplace=True)
-    selected_df2['SHM_Article'] = selected_df2['SHM_Article'].astype(str)
-    
-    selected_columns = pd.merge(selected_columns, selected_df2, on='SHM_Article', how='left')
-
-    selected_columns.loc[:, 'PendingPO (CTN)'] = selected_columns['PO Pending'] / selected_columns['PC_Cartons']
-    selected_columns.loc[:, 'PendingPO (CTN)'] = selected_columns['PendingPO (CTN)'].round(0).astype(int)
-    
-    pivoted_df = selected_columns.pivot_table(
-        index=['CJ_Article', 'SHM_Article'], 
-        columns=['DC'], 
-        values='PO Pending', 
-        aggfunc='sum', 
-        fill_value=0
-        ).reset_index()
-    
-    pivoted_df.columns = ['CJ_Item', 'SHM_Item'] + [f'PO_Qty_to_{col}' for col in pivoted_df.columns[2:]]
-    
-    pivoted_min_del_date = selected_columns.pivot_table(
-        index=['CJ_Article', 'SHM_Article'], 
-        columns='DC', 
-        values='Next Delivery', 
-        aggfunc='min'
-        ).reset_index()
-    
-    pivoted_min_del_date.columns = ['CJ_Item', 'SHM_Item'] + [f'Min_del_date_to_{col}' for col in pivoted_min_del_date.columns[2:]]
-    
-    merged_df = pd.merge(pivoted_df, pivoted_min_del_date, on=['CJ_Item', 'SHM_Item'], how='left')
-
-    desired_columns = [
-            'CJ_Item', 'SHM_Item',
-            'PO_Qty_to_DC1', 'PO_Qty_to_DC2', 'PO_Qty_to_DC4',
-            'Min_del_date_to_DC1', 'Min_del_date_to_DC2', 'Min_del_date_to_DC4'
-        ]
-    
-    for col in desired_columns:
-            if col not in merged_df.columns:
-                merged_df[col] = 0 if 'PO_Qty' in col else pd.NaT
-
-    merged_df['Min_del_date_to_DC4'] = pd.to_datetime(merged_df['Min_del_date_to_DC4'], errors = 'coerce')
-    
-    return merged_df, selected_columns
 
 
 def process_access_data(data_access_uploaded_file):
@@ -820,24 +735,6 @@ def generate_full_stock_report(
     
 
     st.header("Step 3: Finalizing the daily stock report...")
-    # check data structure -------------------------------------------------
-    st.write("Checking data structure of merged DF:")
-    if merged_df not in locals():
-        st.error("merged_df not found")
-        return None, None
-    
-    st.write(f"✅ merged_df columns: {list(merged_df.columns)}")
-             
-    # Check if CJ_Item exists
-    if 'CJ_Item' not in merged_df.columns:
-        st.error("❌ CJ_Item column not found in merged_df!")
-        st.write("Available columns with 'Item' or 'CJ':")
-        item_cols = [col for col in merged_df.columns if 'item' in col.lower() or 'cj' in col.lower()]
-        st.write(item_cols)
-        return None, None
-    # ---------------------------------------------------------------------
-
-
 
 
     # Step 3: Execute query to get the final report
@@ -1075,7 +972,7 @@ if st.button("🚀 Generate Daily Stock Report", type="primary", use_container_w
 
 
                 # ---------------- Step 4: PO Pending All Division ----------------
-                status_text.text("Step 4/7: Processing PO Pending Foods, NF and PCB ...")
+                status_text.text("Step 4/7: Processing PO Pending for all divisions ...")
                 progress_bar.progress(57)
                 access_datasets = process_access_data(access_db_extracted_file)
                 po_access_df, po_access_raw = process_po_in_access(access_datasets)
