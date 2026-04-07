@@ -820,6 +820,26 @@ def generate_full_stock_report(
     
 
     st.header("Step 3: Finalizing the daily stock report...")
+    # check data structure -------------------------------------------------
+    st.write("Checking data structure of merged DF:")
+    if merged_df not in locals():
+        st.error("merged_df not found")
+        return None, None
+    
+    st.write(merged_df columns: {list(merged_df.columns)}")
+             
+    # Check if CJ_Item exists
+    if 'CJ_Item' not in merged_df.columns:
+        st.error("❌ CJ_Item column not found in merged_df!")
+        st.write("Available columns with 'Item' or 'CJ':")
+        item_cols = [col for col in merged_df.columns if 'item' in col.lower() or 'cj' in col.lower()]
+        st.write(item_cols)
+        return None, None
+    # ---------------------------------------------------------------------
+
+
+
+
     # Step 3: Execute query to get the final report
     try:
         query = """
