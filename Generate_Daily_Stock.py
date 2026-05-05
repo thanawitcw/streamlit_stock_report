@@ -217,8 +217,8 @@ def process_po_in_access(access_datasets):
         df['PC_Cartons'] = df['PC_Cartons'].fillna(1)
         # Create new column
         df['PO_Qty'] = df.apply(
-            lambda row: row['Order Qty'] if row['Unit'] == 'ชิ้น' 
-            else row['Order Qty'] * row['PC_Cartons'], axis=1
+            lambda row: row['Actual_Qty'] if row['Unit'] == 'ชิ้น' 
+            else row['Actual_Qty'] * row['PC_Cartons'], axis=1
             )
 
         pivot_po_qty = df.pivot_table(
@@ -275,7 +275,7 @@ def combine_all_PO_data(po_pending_all_div, product_list_df, owner_scm_df):
     def clean_po_pending_all_div(df):
         df['PO Cartons'] = df['PO_Qty'] / df['PC_Cartons']
         # Exclude unnecessary columns
-        df = df.drop(columns=['Devision','Unit','Customer', 'Order Qty'])
+        df = df.drop(columns=['Devision','Unit','Customer', 'Actual_Qty'])
         # Rename Column
         df.rename(columns={
             'PO Num': 'SHM PO No.', 
