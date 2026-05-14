@@ -1013,7 +1013,7 @@ if st.button("🚀 Generate Daily Stock Report", type="primary", use_container_w
                 progress_bar.progress(57)
                 access_datasets = process_access_data(access_db_extracted_file)
                 po_access_df, po_access_raw = process_po_in_access(access_datasets)
-                st.success("✅ Step 4: PO pending Foods and NF has been completely processed")
+                st.success("✅ Step 4: PO pending all divisions has been completely processed")
 
 
                 # ---------------- Step 5: Lead Time ----------------
