@@ -23,9 +23,9 @@ with st.expander("📖 Instructions & Features"):
     **Required Files:**
     1. **Upload all required files in the order specified below.**
 
-        1.1 Sahamit Report ..-..-2025.xlsx
+        1.1 Sahamit Report ..-..-2026.xlsx
         
-        1.2 DC_End..-..-2025.xlsx
+        1.2 DC_End..-..-2026.xlsx
         
         1.3 sellout_past30D.xlsx
         
@@ -42,10 +42,10 @@ with st.expander("📖 Instructions & Features"):
 st.header("Required Files")
 
 st.subheader("Step 1: 📂 Upload Weekly CJ Stock File")
-master_file = st.file_uploader("File Name => Sahamit Report ..-..-2025", type=['xlsx'], key="master")
+master_file = st.file_uploader("File Name => Sahamit Report ..-..-2026", type=['xlsx'], key="master")
 
 st.subheader("Step 2: 📂 Upload Yesterday DC Stock File ")
-dc_stock_file = st.file_uploader("File Name => DC_End..-..-2025", type=['xlsx'], key="dc_stock")
+dc_stock_file = st.file_uploader("File Name => DC_End..-..-2026", type=['xlsx'], key="dc_stock")
 
 st.subheader("Step 3: 📂 Upload last 30 days sales File")
 sellout_file = st.file_uploader("File Name => sellout_past30D", type=['xlsx'], key="sellout")
@@ -89,7 +89,8 @@ def process_dc_stock(dc_stock_file):
         master_df['Plant'] = master_df['Plant'].map({
             'D001': 'DC1',
             'D002': 'DC2',
-            'D004': 'DC4'
+            'D004': 'DC4',
+            'D005': 'DC5'
         })
         
         # Replace <0 with 0
@@ -206,6 +207,7 @@ def process_po_in_access(access_datasets):
             'DC โพธาราม': 'DC1',
             'DC บางวัว 1': 'DC2',
             'DC ขอนแก่น': 'DC4',
+            'DC บุรีรัมย์': 'DC5',
             'DC บางวัว 2': 'TD09'
         }
 
@@ -398,7 +400,7 @@ def fill_na_with_zero(df):
 
 # Create new column to sum ALL PO Pending
 def calculate_totals(merged_df):
-    dc_columns = [1, 2, 4]
+    dc_columns = [1, 2, 4, 5]
     for dc in dc_columns:
         merged_df[f'Total-PO_qty_to_DC{dc}'] = (
             merged_df[f'PO_Qty_to_DC{dc}'])
@@ -409,8 +411,8 @@ def calculate_totals(merged_df):
         ).replace([np.inf, -np.inf], 0)
 
     # Calculate Total Remain Stock
-    merged_df['Remain_StockQty_AllDC'] = merged_df['DC1_Remain_StockQty'] + merged_df['DC2_Remain_StockQty'] + merged_df['DC4_Remain_StockQty']
-    merged_df['Remain_StockValue_AllDC'] = merged_df['DC1_Remain_StockValue'] + merged_df['DC2_Remain_StockValue'] + merged_df['DC4_Remain_StockValue']
+    merged_df['Remain_StockQty_AllDC'] = merged_df['DC1_Remain_StockQty'] + merged_df['DC2_Remain_StockQty'] + merged_df['DC4_Remain_StockQty'] + merged_df['DC5_Remain_StockQty']
+    merged_df['Remain_StockValue_AllDC'] = merged_df['DC1_Remain_StockValue'] + merged_df['DC2_Remain_StockValue'] + merged_df['DC4_Remain_StockValue'] + merged_df['DC5_Remain_StockValue']
 
     # Calculate SO Qty
     for dc in dc_columns:
@@ -422,7 +424,7 @@ def calculate_totals(merged_df):
 
     merged_df['Total_AvgSaleQty30D'] = merged_df[[f'DC{dc}_AvgSaleQty30D' for dc in dc_columns]].sum(axis=1)
     merged_df['Total_AvgSaleQty7D'] = merged_df[[f'DC{dc}_AvgSaleQty7D' for dc in dc_columns]].sum(axis=1)
-
+    
     return merged_df
 
 
@@ -438,7 +440,7 @@ def calculate_DOH(stock_qty, avg_qty):
 
 # Simplified DOH calculations for various stock locations
 def apply_doh_calculations(merged_df):
-    dc_list = ['DC1', 'DC2', 'DC4']
+    dc_list = ['DC1', 'DC2', 'DC4', 'DC5']
     max_doh_value = 1825
     current_date = pd.to_datetime(datetime.now().date())
 
@@ -460,7 +462,8 @@ def apply_doh_calculations(merged_df):
     dc_date_columns = {
         'DC1': ['Min_del_date_to_DC1'],
         'DC2': ['Min_del_date_to_DC2'],
-        'DC4': ['Min_del_date_to_DC4']
+        'DC4': ['Min_del_date_to_DC4'],
+        'DC5': ['Min_del_date_to_DC5']
     }
 
     for dc, cols in dc_date_columns.items():
@@ -480,7 +483,7 @@ def apply_doh_calculations(merged_df):
     # Cap DOH values
     doh_columns = ['Current_DOH_All_DC'] + [f'Current_{dc}_DOH' for dc in dc_list] 
     for col in doh_columns:
-        merged_df[col] = np.where(merged_df[col] > max_doh_value, np.inf, merged_df[col])
+        merged_df[col] = np.where(merged_df[col] > max_doh_value, 365, merged_df[col])
 
 
     # Initialize cover date columns
@@ -495,8 +498,8 @@ def apply_doh_calculations(merged_df):
 
 
 # Function for calculating DOH past delivery date (deal with DC Cover date < Min Delivery Date)
-def apply_doh_past_delivery_date(merged_df, current_date, max_doh_value):
-    dc_list = ['DC1', 'DC2', 'DC4']
+def apply_doh_past_delivery_date(merged_df, max_doh_value):
+    dc_list = ['DC1', 'DC2', 'DC4', 'DC5']
 
     for dc in dc_list:
         # initialize the column
@@ -520,6 +523,7 @@ def apply_doh_past_delivery_date(merged_df, current_date, max_doh_value):
                     row[f'{dc}_AvgSaleQty90D']
                 )
             merged_df.at[index, f'{dc}_DOH(Stock+PO)'] = doh_value
+            
 
     # Calculate for all DCs
     merged_df['Current_DOH(Stock+PO)_All_DC'] = 0.0 
@@ -543,14 +547,14 @@ def apply_doh_past_delivery_date(merged_df, current_date, max_doh_value):
     for dc in dc_list:
         merged_df[f'{dc}_DOH(Stock+PO)'] = np.where(
             merged_df[f'{dc}_DOH(Stock+PO)'] > max_doh_value,
-            np.inf,
+            365,
             merged_df[f'{dc}_DOH(Stock+PO)']
         )
     
     # Cap All DC DOH(Stock+PO)
     merged_df['Current_DOH(Stock+PO)_All_DC'] = np.where(
         merged_df['Current_DOH(Stock+PO)_All_DC'] > max_doh_value,
-        np.inf,
+        365,
         merged_df['Current_DOH(Stock+PO)_All_DC']
     )
     
@@ -568,6 +572,8 @@ def apply_cover_date_calculations(merged_df, current_date, max_doh_value):
         'Stock_DC2_cover_to_date': 'Current_DC2_DOH',
         'Store_DC4_cover_to_date': 'DC4_DOHStore',
         'Stock_DC4_cover_to_date': 'Current_DC4_DOH',
+        'Store_DC5_cover_to_date': 'DC5_DOHStore',
+        'Stock_DC5_cover_to_date': 'Current_DC5_DOH'
     }
     # check min del date case
     po_case_map = {
@@ -590,6 +596,11 @@ def apply_cover_date_calculations(merged_df, current_date, max_doh_value):
             'doh_col': 'DC4_DOH(Stock+PO)',
             'min_del_col': 'Min_delivery_date_to_DC4',
             'stock_cover_col': 'Stock_DC4_cover_to_date'
+        },
+        'Stock+PO_DC5_cover_to_date': {
+            'doh_col': 'DC5_DOH(Stock+PO)',
+            'min_del_col': 'Min_delivery_date_to_DC5',
+            'stock_cover_col': 'Stock_DC5_cover_to_date'
         }
     }
 
@@ -721,7 +732,7 @@ def generate_full_stock_report(
 
         merged_df, current_date, max_doh_value = apply_doh_calculations(merged_df)
         merged_df = apply_cover_date_calculations(merged_df, current_date, max_doh_value)
-        merged_df = apply_doh_past_delivery_date(merged_df, current_date, max_doh_value)
+        merged_df = apply_doh_past_delivery_date(merged_df, max_doh_value)
         merged_df = apply_cover_date_calculations(merged_df, current_date, max_doh_value)
 
 
@@ -824,7 +835,25 @@ def generate_full_stock_report(
             [Total-PO_qty_to_DC4],
             Min_delivery_date_to_DC4,
             [DC4_DOH(Stock+PO)],
-            [Stock+PO_DC4_cover_to_date]
+            [Stock+PO_DC4_cover_to_date],
+            DC5_ScmAssort,
+            DC5_OOSAssort,
+            DC5_CountOKROOS,
+            DC5_PercOOS,
+            DC5_StoreStockQty,
+            DC5_DOHStore,
+            Store_DC5_cover_to_date,
+            DC5_AvgSaleQty90D,
+            DC5_AvgSaleQty30D,
+            DC5_AvgSaleQty7D,
+            [%Ratio_AvgSalesQty90D_DC5],
+            DC5_Remain_StockQty,
+            Current_DC5_DOH,
+            Stock_DC5_cover_to_date,
+            [Total-PO_qty_to_DC5],
+            Min_delivery_date_to_DC5,
+            [DC5_DOH(Stock+PO)],
+            [Stock+PO_DC5_cover_to_date]
         FROM merged_df
         WHERE ([Group] != 'Discontinuous' or [Group] IS NULL)
         ORDER BY CJ_Item ASC
@@ -853,18 +882,22 @@ def generate_full_stock_report(
             'Min_delivery_date_to_DC1',
             'Min_delivery_date_to_DC2',
             'Min_delivery_date_to_DC4',
+            'Min_delivery_date_to_DC5',
             'Total_Store_cover_to_date',
             'Store_DC1_cover_to_date',
             'Store_DC2_cover_to_date',
             'Store_DC4_cover_to_date',
+            'Store_DC5_cover_to_date',
             'Stock_All_DC_Cover_to_date',
             'Stock_DC1_cover_to_date',
             'Stock_DC2_cover_to_date',
             'Stock_DC4_cover_to_date',
+            'Stock_DC5_cover_to_date',
             'Stock+PO_All_DC_Cover_to_date',
             'Stock+PO_DC1_cover_to_date',
             'Stock+PO_DC2_cover_to_date',
-            'Stock+PO_DC4_cover_to_date'
+            'Stock+PO_DC4_cover_to_date',
+            'Stock+PO_DC5_cover_to_date'
         ]
 
         for col in date_columns:
@@ -888,20 +921,26 @@ def generate_full_stock_report(
             'DC4_AvgSaleQty90D': 'DC4_AvgSaleCTN_Last90Days',
             'DC4_AvgSaleQty30D': 'DC4_AvgSaleCTN_Last30Days',
             'DC4_AvgSaleQty7D': 'DC4_AvgSaleCTN_Last7Days',
+            'DC5_AvgSaleQty90D': 'DC5_AvgSaleCTN_Last90Days',
+            'DC5_AvgSaleQty30D': 'DC5_AvgSaleCTN_Last30Days',
+            'DC5_AvgSaleQty7D': 'DC5_AvgSaleCTN_Last7Days',
             'Total_StoreStockQty': 'Total_StoreStockCTN',
             'DC1_StoreStockQty': 'DC1_StoreStockCTN',
             'DC2_StoreStockQty': 'DC2_StoreStockCTN',
             'DC4_StoreStockQty': 'DC4_StoreStockCTN',
+            'DC5_StoreStockQty': 'DC5_StoreStockCTN',
             'SO_Qty_last7D': 'SO_CTN_last7D',
             'Remain_StockQty_AllDC': 'Remain_CTN_AllDC',
             'DC1_Remain_StockQty': 'DC1_Remain_CTN',
             'DC2_Remain_StockQty': 'DC2_Remain_CTN',
             'DC4_Remain_StockQty': 'DC4_Remain_CTN',
+            'DC5_Remain_StockQty': 'DC5_Remain_CTN',
             'Total-PO_qty_to_DC': 'Total-CTN_to_DC',
             'Total-PO_qty_to_DC1': 'Total-CTN_to_DC1',
             'Total-PO_qty_to_DC2': 'Total-CTN_to_DC2',
-            'Total-PO_qty_to_DC4': 'Total-CTN_to_DC4'
-        }
+            'Total-PO_qty_to_DC4': 'Total-CTN_to_DC4',
+            'Total-PO_qty_to_DC5': 'Total-CTN_to_DC5'
+    }
 
         # Process the rename
         modified_df = result_df.rename(columns=column_rename_mapping)
